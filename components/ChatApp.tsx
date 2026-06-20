@@ -1,35 +1,43 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import ChatRoom from "@/components/ChatRoom";
 import UsernameForm from "@/components/UsernameForm";
-import {
-  DEFAULT_ROOM_ID,
-  isRoomId,
-  type RoomId,
-} from "@/types/room";
+import { getOrCreateClientId } from "@/lib/clientId";
 
 const USERNAME_STORAGE_KEY = "chat-username";
 const ROOM_STORAGE_KEY = "chat-room-id";
 
 export default function ChatApp() {
   const [username, setUsername] = useState<string | null>(null);
-  const [roomId, setRoomId] = useState<RoomId>(DEFAULT_ROOM_ID);
+  const [clientId, setClientId] = useState("");
+  const [roomId, setRoomId] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     const storedUsername = window.localStorage.getItem(USERNAME_STORAGE_KEY);
     const storedRoomId = window.localStorage.getItem(ROOM_STORAGE_KEY);
 
+    setClientId(getOrCreateClientId());
+
     if (storedUsername) {
       setUsername(storedUsername);
     }
 
-    if (storedRoomId && isRoomId(storedRoomId)) {
+    if (storedRoomId) {
       setRoomId(storedRoomId);
     }
 
     setIsReady(true);
+  }, []);
+
+  const handleRoomChange = useCallback((nextRoomId: string | null) => {
+    if (nextRoomId) {
+      window.localStorage.setItem(ROOM_STORAGE_KEY, nextRoomId);
+    } else {
+      window.localStorage.removeItem(ROOM_STORAGE_KEY);
+    }
+    setRoomId(nextRoomId);
   }, []);
 
   function handleJoin(nextUsername: string) {
@@ -37,17 +45,12 @@ export default function ChatApp() {
     setUsername(nextUsername);
   }
 
-  function handleRoomChange(nextRoomId: RoomId) {
-    window.localStorage.setItem(ROOM_STORAGE_KEY, nextRoomId);
-    setRoomId(nextRoomId);
-  }
-
   function handleLeave() {
     window.localStorage.removeItem(USERNAME_STORAGE_KEY);
     setUsername(null);
   }
 
-  if (!isReady) {
+  if (!isReady || !clientId) {
     return (
       <div className="flex h-dvh items-center justify-center bg-slate-50 text-sm text-slate-500">
         読み込み中...
@@ -62,6 +65,7 @@ export default function ChatApp() {
   return (
     <ChatRoom
       username={username}
+      clientId={clientId}
       roomId={roomId}
       onRoomChange={handleRoomChange}
       onLeave={handleLeave}

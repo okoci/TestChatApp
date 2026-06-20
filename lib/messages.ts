@@ -10,11 +10,10 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 import type { Message } from "@/types/message";
-import type { RoomId } from "@/types/room";
 
 const MESSAGE_LIMIT = 100;
 
-function getMessagesCollection(roomId: RoomId) {
+function getMessagesCollection(roomId: string) {
   return collection(db, "rooms", roomId, "messages");
 }
 
@@ -31,7 +30,7 @@ function toMessage(id: string, data: Record<string, unknown>): Message {
 }
 
 export function subscribeMessages(
-  roomId: RoomId,
+  roomId: string,
   callback: (messages: Message[]) => void,
 ) {
   const messagesQuery = query(
@@ -49,7 +48,7 @@ export function subscribeMessages(
 }
 
 export async function sendMessage(
-  roomId: RoomId,
+  roomId: string,
   username: string,
   text: string,
 ) {
