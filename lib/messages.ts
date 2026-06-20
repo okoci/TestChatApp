@@ -10,9 +10,13 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 import type { Message } from "@/types/message";
+import type { RoomId } from "@/types/room";
 
-const MESSAGES_COLLECTION = "messages";
 const MESSAGE_LIMIT = 100;
+
+function getMessagesCollection(roomId: RoomId) {
+  return collection(db, "rooms", roomId, "messages");
+}
 
 function toMessage(id: string, data: Record<string, unknown>): Message {
   const createdAt = data.createdAt;
@@ -26,9 +30,12 @@ function toMessage(id: string, data: Record<string, unknown>): Message {
   };
 }
 
-export function subscribeMessages(callback: (messages: Message[]) => void) {
+export function subscribeMessages(
+  roomId: RoomId,
+  callback: (messages: Message[]) => void,
+) {
   const messagesQuery = query(
-    collection(db, MESSAGES_COLLECTION),
+    getMessagesCollection(roomId),
     orderBy("createdAt", "asc"),
     limit(MESSAGE_LIMIT),
   );
@@ -41,14 +48,18 @@ export function subscribeMessages(callback: (messages: Message[]) => void) {
   });
 }
 
-export async function sendMessage(username: string, text: string) {
+export async function sendMessage(
+  roomId: RoomId,
+  username: string,
+  text: string,
+) {
   const trimmedText = text.trim();
 
   if (!trimmedText) {
     return;
   }
 
-  await addDoc(collection(db, MESSAGES_COLLECTION), {
+  await addDoc(getMessagesCollection(roomId), {
     username,
     text: trimmedText,
     createdAt: serverTimestamp(),

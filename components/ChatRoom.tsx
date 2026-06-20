@@ -3,30 +3,43 @@
 import { useEffect, useState } from "react";
 import MessageInput from "@/components/MessageInput";
 import MessageList from "@/components/MessageList";
+import RoomSelector from "@/components/RoomSelector";
 import { sendMessage, subscribeMessages } from "@/lib/messages";
 import type { Message } from "@/types/message";
+import { getRoomById, type RoomId } from "@/types/room";
 
 type ChatRoomProps = {
   username: string;
+  roomId: RoomId;
+  onRoomChange: (roomId: RoomId) => void;
   onLeave: () => void;
 };
 
-export default function ChatRoom({ username, onLeave }: ChatRoomProps) {
+export default function ChatRoom({
+  username,
+  roomId,
+  onRoomChange,
+  onLeave,
+}: ChatRoomProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [error, setError] = useState<string | null>(null);
 
+  const activeRoom = getRoomById(roomId);
+
   useEffect(() => {
-    const unsubscribe = subscribeMessages((nextMessages) => {
+    setMessages([]);
+
+    const unsubscribe = subscribeMessages(roomId, (nextMessages) => {
       setMessages(nextMessages);
       setError(null);
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [roomId]);
 
   async function handleSend(text: string) {
     try {
-      await sendMessage(username, text);
+      await sendMessage(roomId, username, text);
       setError(null);
     } catch (sendError) {
       console.error(sendError);
@@ -39,7 +52,9 @@ export default function ChatRoom({ username, onLeave }: ChatRoomProps) {
       <header className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3">
         <div>
           <h1 className="text-lg font-semibold text-slate-900">TestChatApp</h1>
-          <p className="text-sm text-slate-500">{username} として参加中</p>
+          <p className="text-sm text-slate-500">
+            {username} ・ {activeRoom?.label ?? roomId}
+          </p>
         </div>
         <button
           type="button"
@@ -49,6 +64,8 @@ export default function ChatRoom({ username, onLeave }: ChatRoomProps) {
           退出
         </button>
       </header>
+
+      <RoomSelector activeRoomId={roomId} onChange={onRoomChange} />
 
       {error ? (
         <div className="border-b border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
