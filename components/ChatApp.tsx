@@ -1,24 +1,54 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import type { User } from "firebase/auth";
 import ChatRoom from "@/components/ChatRoom";
 import UsernameForm from "@/components/UsernameForm";
-import { getOrCreateClientId } from "@/lib/clientId";
+import { ensureAnonymousAuth, subscribeAuth } from "@/lib/auth";
 
 const USERNAME_STORAGE_KEY = "chat-username";
 const ROOM_STORAGE_KEY = "chat-room-id";
 
 export default function ChatApp() {
   const [username, setUsername] = useState<string | null>(null);
-  const [clientId, setClientId] = useState("");
+  const [user, setUser] = useState<User | null>(null);
   const [roomId, setRoomId] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+
+    async function initialize() {
+      try {
+        await ensureAnonymousAuth();
+      } catch (error) {
+        console.error(error);
+
+        if (!cancelled) {
+          setAuthError(
+            "匿名認証に失敗しました。ページを再読み込みしてください。",
+          );
+        }
+      }
+    }
+
+    const unsubscribe = subscribeAuth((nextUser) => {
+      if (cancelled) {
+        return;
+      }
+
+      setUser(nextUser);
+
+      if (nextUser) {
+        setAuthError(null);
+      }
+    });
+
+    void initialize();
+
     const storedUsername = window.localStorage.getItem(USERNAME_STORAGE_KEY);
     const storedRoomId = window.localStorage.getItem(ROOM_STORAGE_KEY);
-
-    setClientId(getOrCreateClientId());
 
     if (storedUsername) {
       setUsername(storedUsername);
@@ -29,6 +59,11 @@ export default function ChatApp() {
     }
 
     setIsReady(true);
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, []);
 
   const handleRoomChange = useCallback((nextRoomId: string | null) => {
@@ -50,10 +85,18 @@ export default function ChatApp() {
     setUsername(null);
   }
 
-  if (!isReady || !clientId) {
+  if (!isReady) {
     return (
       <div className="flex h-dvh items-center justify-center bg-slate-50 text-sm text-slate-500">
         読み込み中...
+      </div>
+    );
+  }
+
+  if (authError || !user) {
+    return (
+      <div className="flex h-dvh items-center justify-center bg-slate-50 px-4 text-center text-sm text-red-600">
+        {authError ?? "認証情報を取得できませんでした。"}
       </div>
     );
   }
@@ -65,7 +108,7 @@ export default function ChatApp() {
   return (
     <ChatRoom
       username={username}
-      clientId={clientId}
+      user={user}
       roomId={roomId}
       onRoomChange={handleRoomChange}
       onLeave={handleLeave}

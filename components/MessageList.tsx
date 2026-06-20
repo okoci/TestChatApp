@@ -6,6 +6,9 @@ import type { Message } from "@/types/message";
 type MessageListProps = {
   messages: Message[];
   currentUsername: string;
+  isAdmin?: boolean;
+  isDeletingMessageId?: string | null;
+  onDeleteMessage?: (messageId: string) => void;
 };
 
 function formatTime(date: Date) {
@@ -18,6 +21,9 @@ function formatTime(date: Date) {
 export default function MessageList({
   messages,
   currentUsername,
+  isAdmin = false,
+  isDeletingMessageId = null,
+  onDeleteMessage,
 }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -35,6 +41,8 @@ export default function MessageList({
         messages.map((message) => {
           const isOwnMessage = message.username === currentUsername;
 
+          const isDeleting = isDeletingMessageId === message.id;
+
           return (
             <div
               key={message.id}
@@ -50,6 +58,19 @@ export default function MessageList({
                 <div className="mb-1 flex items-center gap-2 text-xs opacity-80">
                   <span className="font-semibold">{message.username}</span>
                   <span>{formatTime(message.createdAt)}</span>
+                  {isAdmin && onDeleteMessage ? (
+                    <button
+                      type="button"
+                      onClick={() => onDeleteMessage(message.id)}
+                      disabled={isDeleting}
+                      aria-label="メッセージを削除"
+                      className={`ml-auto rounded px-1.5 py-0.5 transition hover:bg-black/10 disabled:cursor-not-allowed disabled:opacity-50 ${
+                        isOwnMessage ? "text-white" : "text-red-600"
+                      }`}
+                    >
+                      {isDeleting ? "削除中..." : "削除"}
+                    </button>
+                  ) : null}
                 </div>
                 <p className="break-words text-sm leading-6">{message.text}</p>
               </div>

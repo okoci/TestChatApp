@@ -1,21 +1,25 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
     match /rooms/{roomId} {
       allow read: if true;
-      allow create: if
-        request.resource.data.keys().hasAll(['name', 'ownerId', 'createdAt'])
+      allow create: if isSignedIn()
+        && request.resource.data.keys().hasAll(['name', 'ownerId', 'createdAt'])
         && request.resource.data.name is string
         && request.resource.data.name.size() > 0
         && request.resource.data.name.size() <= 30
         && request.resource.data.ownerId is string
-        && request.resource.data.ownerId.size() > 0;
+        && request.resource.data.ownerId == request.auth.uid;
       allow update, delete: if false;
 
       match /messages/{messageId} {
         allow read: if true;
-        allow create: if
-          request.resource.data.keys().hasAll(['username', 'text', 'createdAt'])
+        allow create: if isSignedIn()
+          && request.resource.data.keys().hasAll(['username', 'text', 'createdAt'])
           && request.resource.data.username is string
           && request.resource.data.username.size() > 0
           && request.resource.data.username.size() <= 20

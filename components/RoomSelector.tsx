@@ -6,19 +6,25 @@ import type { Room } from "@/types/room";
 type RoomSelectorProps = {
   rooms: Room[];
   activeRoomId: string | null;
-  clientId: string;
+  uid: string;
   isCreating: boolean;
+  isDeletingRoom?: boolean;
+  isAdmin?: boolean;
   onChange: (roomId: string) => void;
   onCreateRoom: (name: string) => Promise<string | null>;
+  onDeleteRoom?: (roomId: string) => Promise<void>;
 };
 
 export default function RoomSelector({
   rooms,
   activeRoomId,
-  clientId,
+  uid,
   isCreating,
+  isDeletingRoom = false,
+  isAdmin = false,
   onChange,
   onCreateRoom,
+  onDeleteRoom,
 }: RoomSelectorProps) {
   const [roomName, setRoomName] = useState("");
   const [createError, setCreateError] = useState<string | null>(null);
@@ -70,11 +76,23 @@ export default function RoomSelector({
         )}
       </div>
 
-      <p className="mt-2 px-2 text-xs text-slate-500">
-        {activeRoom
-          ? `作成者ID: ${activeRoom.ownerId === clientId ? "あなた" : activeRoom.ownerId.slice(0, 8)}`
-          : "ルームを選択するか、新しく作成してください。"}
-      </p>
+      <div className="mt-2 flex items-center justify-between gap-2 px-2">
+        <p className="text-xs text-slate-500">
+          {activeRoom
+            ? `作成者ID: ${activeRoom.ownerId === uid ? "あなた" : activeRoom.ownerId.slice(0, 8)}`
+            : "ルームを選択するか、新しく作成してください。"}
+        </p>
+        {isAdmin && activeRoom && onDeleteRoom ? (
+          <button
+            type="button"
+            onClick={() => onDeleteRoom(activeRoom.id)}
+            disabled={isDeletingRoom}
+            className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isDeletingRoom ? "削除中..." : "ルーム削除"}
+          </button>
+        ) : null}
+      </div>
 
       <form className="mt-3 flex gap-2 px-2" onSubmit={handleCreate}>
         <input
