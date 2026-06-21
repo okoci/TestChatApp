@@ -16,9 +16,14 @@ import {
   signInWithGoogle,
   signOutToAnonymous,
 } from "@/lib/auth";
+import {
+  canDeleteMessage,
+  canDeleteRoom,
+} from "@/lib/permissions";
 import { useAdminGate } from "@/lib/useAdminGate";
-import { sendMessage, subscribeMessages } from "@/lib/messages";
-import { createRoom, subscribeRooms } from "@/lib/rooms";
+import { useIsMobile } from "@/lib/useIsMobile";
+import { deleteMessageDoc, sendMessage, subscribeMessages } from "@/lib/messages";
+import { createRoom, deleteOwnRoom, subscribeRooms } from "@/lib/rooms";
 import type { Message } from "@/types/message";
 import type { Room } from "@/types/room";
 
@@ -49,6 +54,7 @@ export default function ChatRoom({
   const [isAuthActionLoading, setIsAuthActionLoading] = useState(false);
 
   const { isAdminGateUnlocked, handleLogoTap } = useAdminGate();
+  const isMobile = useIsMobile();
   const isAdmin = isAdminUser(user);
   const googleSignedIn = isGoogleSignedIn(user);
   const activeRoom = rooms.find((room) => room.id === roomId) ?? null;
@@ -102,7 +108,7 @@ export default function ChatRoom({
     }
 
     try {
-      await sendMessage(roomId, username, text);
+      await sendMessage(roomId, user.uid, username, text);
       setError(null);
     } catch (sendError) {
       console.error(sendError);
@@ -114,8 +120,15 @@ export default function ChatRoom({
     const targetRoom = rooms.find((room) => room.id === targetRoomId);
 
     if (
+      !targetRoom ||
+      !canDeleteRoom(targetRoom, user.uid, isAdmin)
+    ) {
+      return;
+    }
+
+    if (
       !window.confirm(
-        `「${targetRoom?.name ?? "このルーム"}」を削除しますか？\n配下のメッセージもすべて削除されます。`,
+        `「${targetRoom.name}」を削除しますか？\n配下のメッセージもすべて削除されます。`,
       )
     ) {
       return;
@@ -124,7 +137,11 @@ export default function ChatRoom({
     setIsDeletingRoom(true);
 
     try {
-      await deleteRoomApi(targetRoomId);
+      if (isAdmin) {
+        await deleteRoomApi(targetRoomId);
+      } else {
+        await deleteOwnRoom(targetRoomId);
+      }
       setError(null);
     } catch (deleteError) {
       console.error(deleteError);
@@ -142,8 +159,15 @@ export default function ChatRoom({
     const targetMessage = messages.find((message) => message.id === messageId);
 
     if (
+      !targetMessage ||
+      !canDeleteMessage(targetMessage, user.uid, isAdmin)
+    ) {
+      return;
+    }
+
+    if (
       !window.confirm(
-        `このメッセージを削除しますか？\n\n${targetMessage?.username ?? ""}: ${targetMessage?.text ?? ""}`,
+        `このメッセージを削除しますか？\n\n${targetMessage.username}: ${targetMessage.text}`,
       )
     ) {
       return;
@@ -152,7 +176,11 @@ export default function ChatRoom({
     setDeletingMessageId(messageId);
 
     try {
-      await deleteMessageApi(roomId, messageId);
+      if (isAdmin) {
+        await deleteMessageApi(roomId, messageId);
+      } else {
+        await deleteMessageDoc(roomId, messageId);
+      }
       setError(null);
     } catch (deleteError) {
       console.error(deleteError);
@@ -246,9 +274,10 @@ export default function ChatRoom({
         isCreating={isCreating}
         isDeletingRoom={isDeletingRoom}
         isAdmin={isAdmin}
+        isMobile={isMobile}
         onChange={onRoomChange}
         onCreateRoom={handleCreateRoom}
-        onDeleteRoom={isAdmin ? handleDeleteRoom : undefined}
+        onDeleteRoom={handleDeleteRoom}
       />
 
       {error ? (
@@ -261,10 +290,12 @@ export default function ChatRoom({
         <>
           <MessageList
             messages={messages}
+            currentUid={user.uid}
             currentUsername={username}
             isAdmin={isAdmin}
+            isMobile={isMobile}
             isDeletingMessageId={deletingMessageId}
-            onDeleteMessage={isAdmin ? handleDeleteMessage : undefined}
+            onDeleteMessage={handleDeleteMessage}
           />
           <MessageInput onSend={handleSend} />
         </>

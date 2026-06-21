@@ -1,6 +1,8 @@
 import {
   addDoc,
   collection,
+  deleteDoc,
+  doc,
   limit,
   onSnapshot,
   orderBy,
@@ -22,6 +24,7 @@ function toMessage(id: string, data: Record<string, unknown>): Message {
 
   return {
     id,
+    uid: String(data.uid ?? ""),
     username: String(data.username ?? ""),
     text: String(data.text ?? ""),
     createdAt:
@@ -49,6 +52,7 @@ export function subscribeMessages(
 
 export async function sendMessage(
   roomId: string,
+  uid: string,
   username: string,
   text: string,
 ) {
@@ -59,8 +63,13 @@ export async function sendMessage(
   }
 
   await addDoc(getMessagesCollection(roomId), {
+    uid,
     username,
     text: trimmedText,
     createdAt: serverTimestamp(),
   });
+}
+
+export async function deleteMessageDoc(roomId: string, messageId: string) {
+  await deleteDoc(doc(db, "rooms", roomId, "messages", messageId));
 }

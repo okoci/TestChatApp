@@ -1,14 +1,21 @@
 import {
   addDoc,
   collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  limit,
   onSnapshot,
   orderBy,
   query,
   serverTimestamp,
   Timestamp,
+  writeBatch,
 } from "firebase/firestore";
 import { db } from "./firebase";
 import type { Room } from "@/types/room";
+
+const DELETE_BATCH_SIZE = 500;
 
 function toRoom(id: string, data: Record<string, unknown>): Room {
   const createdAt = data.createdAt;
@@ -48,4 +55,27 @@ export async function createRoom(name: string, ownerId: string) {
   });
 
   return docRef.id;
+}
+
+async function deleteAllMessages(roomId: string) {
+  const messagesRef = collection(db, "rooms", roomId, "messages");
+
+  while (true) {
+    const snapshot = await getDocs(
+      query(messagesRef, orderBy("createdAt", "asc"), limit(DELETE_BATCH_SIZE)),
+    );
+
+    if (snapshot.empty) {
+      return;
+    }
+
+    const batch = writeBatch(db);
+    snapshot.docs.forEach((messageDoc) => batch.delete(messageDoc.ref));
+    await batch.commit();
+  }
+}
+
+export async function deleteOwnRoom(roomId: string) {
+  await deleteAllMessages(roomId);
+  await deleteDoc(doc(db, "rooms", roomId));
 }

@@ -1,6 +1,8 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { canDeleteRoom } from "@/lib/permissions";
+import { useLongPress } from "@/lib/useLongPress";
 import type { Room } from "@/types/room";
 
 type RoomSelectorProps = {
@@ -10,10 +12,69 @@ type RoomSelectorProps = {
   isCreating: boolean;
   isDeletingRoom?: boolean;
   isAdmin?: boolean;
+  isMobile?: boolean;
   onChange: (roomId: string) => void;
   onCreateRoom: (name: string) => Promise<string | null>;
   onDeleteRoom?: (roomId: string) => Promise<void>;
 };
+
+type RoomTabProps = {
+  room: Room;
+  isActive: boolean;
+  uid: string;
+  isAdmin: boolean;
+  isMobile: boolean;
+  onChange: (roomId: string) => void;
+  onDeleteRoom?: (roomId: string) => Promise<void>;
+};
+
+function RoomTab({
+  room,
+  isActive,
+  uid,
+  isAdmin,
+  isMobile,
+  onChange,
+  onDeleteRoom,
+}: RoomTabProps) {
+  const deletable = canDeleteRoom(room, uid, isAdmin);
+
+  const longPress = useLongPress(() => {
+    if (deletable && onDeleteRoom) {
+      void onDeleteRoom(room.id);
+    }
+  });
+
+  return (
+    <button
+      type="button"
+      onClick={(event) => {
+        if (isMobile && longPress.shouldSuppressClick()) {
+          event.preventDefault();
+          return;
+        }
+
+        onChange(room.id);
+      }}
+      className={`min-h-11 shrink-0 rounded-xl px-4 py-2 text-sm font-medium transition ${
+        isActive
+          ? "bg-blue-600 text-white"
+          : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+      } ${deletable && isMobile ? "select-none touch-manipulation" : ""}`}
+      {...(deletable && isMobile
+        ? {
+            onPointerDown: longPress.onPointerDown,
+            onPointerUp: longPress.onPointerUp,
+            onPointerLeave: longPress.onPointerLeave,
+            onPointerCancel: longPress.onPointerCancel,
+            onContextMenu: longPress.onContextMenu,
+          }
+        : {})}
+    >
+      {room.name}
+    </button>
+  );
+}
 
 export default function RoomSelector({
   rooms,
@@ -22,6 +83,7 @@ export default function RoomSelector({
   isCreating,
   isDeletingRoom = false,
   isAdmin = false,
+  isMobile = false,
   onChange,
   onCreateRoom,
   onDeleteRoom,
@@ -30,6 +92,9 @@ export default function RoomSelector({
   const [createError, setCreateError] = useState<string | null>(null);
 
   const activeRoom = rooms.find((room) => room.id === activeRoomId);
+  const canDeleteActiveRoom = activeRoom
+    ? canDeleteRoom(activeRoom, uid, isAdmin)
+    : false;
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -55,24 +120,18 @@ export default function RoomSelector({
             ルームがありません。下のフォームから作成してください。
           </p>
         ) : (
-          rooms.map((room) => {
-            const isActive = room.id === activeRoomId;
-
-            return (
-              <button
-                key={room.id}
-                type="button"
-                onClick={() => onChange(room.id)}
-                className={`min-h-11 shrink-0 rounded-xl px-4 py-2 text-sm font-medium transition ${
-                  isActive
-                    ? "bg-blue-600 text-white"
-                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                }`}
-              >
-                {room.name}
-              </button>
-            );
-          })
+          rooms.map((room) => (
+            <RoomTab
+              key={room.id}
+              room={room}
+              isActive={room.id === activeRoomId}
+              uid={uid}
+              isAdmin={isAdmin}
+              isMobile={isMobile}
+              onChange={onChange}
+              onDeleteRoom={onDeleteRoom}
+            />
+          ))
         )}
       </div>
 
@@ -82,7 +141,7 @@ export default function RoomSelector({
             ? `作成者ID: ${activeRoom.ownerId === uid ? "あなた" : activeRoom.ownerId.slice(0, 8)}`
             : "ルームを選択するか、新しく作成してください。"}
         </p>
-        {isAdmin && activeRoom && onDeleteRoom ? (
+        {canDeleteActiveRoom && !isMobile && activeRoom && onDeleteRoom ? (
           <button
             type="button"
             onClick={() => onDeleteRoom(activeRoom.id)}
