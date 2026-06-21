@@ -1,6 +1,8 @@
 import { unauthorizedResponse, verifyAdminRequest } from "@/lib/admin-auth";
 import { deleteRoom } from "@/lib/server/rooms";
 
+export const runtime = "nodejs";
+
 type RouteContext = {
   params: Promise<{ roomId: string }>;
 };
@@ -20,15 +22,12 @@ export async function DELETE(request: Request, context: RouteContext) {
     await deleteRoom(roomId);
     return Response.json({ ok: true });
   } catch (error) {
-    console.error(error);
+    console.error("[Admin API] Failed to delete room:", error);
 
     if (error instanceof Error && error.message === "Room not found.") {
       return Response.json({ error: error.message }, { status: 404 });
     }
 
-    return Response.json(
-      { error: "Failed to delete room." },
-      { status: 500 },
-    );
+    return Response.json({ error: String(error) }, { status: 500 });
   }
 }

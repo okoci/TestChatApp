@@ -4,7 +4,7 @@ export async function deleteMessage(
   roomId: string,
   messageId: string,
 ): Promise<void> {
-  const db = getAdminFirestore();
+  const db = await getAdminFirestore();
   const messageRef = db
     .collection("rooms")
     .doc(roomId)
