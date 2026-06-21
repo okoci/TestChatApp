@@ -19,8 +19,7 @@ export async function verifyAdminRequest(request: Request): Promise<boolean> {
   let decoded;
 
   try {
-    const adminAuth = await getAdminAuth();
-    decoded = await adminAuth.verifyIdToken(token);
+    decoded = await getAdminAuth().verifyIdToken(token);
   } catch (error) {
     console.error("[Admin Auth] Token verification failed:", error);
     return false;

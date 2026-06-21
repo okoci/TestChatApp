@@ -1,12 +1,5 @@
-import {
-  cert,
-  getApps,
-  initializeApp,
-  type App,
-  type ServiceAccount,
-} from "firebase-admin/app";
-import type { Auth } from "firebase-admin/auth";
-import type { Firestore } from "firebase-admin/firestore";
+import admin from "firebase-admin";
+import type { ServiceAccount } from "firebase-admin";
 
 function parseServiceAccount(): ServiceAccount {
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
@@ -34,16 +27,16 @@ function parseServiceAccount(): ServiceAccount {
   }
 }
 
-function getAdminApp(): App {
-  const existingApp = getApps()[0];
+function ensureAdminApp(): admin.app.App {
+  const existingApp = admin.apps[0];
 
   if (existingApp) {
     return existingApp;
   }
 
   try {
-    return initializeApp({
-      credential: cert(parseServiceAccount()),
+    return admin.initializeApp({
+      credential: admin.credential.cert(parseServiceAccount()),
     });
   } catch (error) {
     console.error("[Admin SDK] App initialization failed:", error);
@@ -51,22 +44,22 @@ function getAdminApp(): App {
   }
 }
 
-export async function getAdminFirestore(): Promise<Firestore> {
+export function getAdminAuth(): admin.auth.Auth {
   try {
-    const { getFirestore } = await import("firebase-admin/firestore");
-    return getFirestore(getAdminApp());
+    ensureAdminApp();
+    return admin.auth();
   } catch (error) {
-    console.error("[Admin SDK] Firestore initialization failed:", error);
+    console.error("[Admin SDK] Auth initialization failed:", error);
     throw error;
   }
 }
 
-export async function getAdminAuth(): Promise<Auth> {
+export function getAdminFirestore(): admin.firestore.Firestore {
   try {
-    const { getAuth } = await import("firebase-admin/auth");
-    return getAuth(getAdminApp());
+    ensureAdminApp();
+    return admin.firestore();
   } catch (error) {
-    console.error("[Admin SDK] Auth initialization failed:", error);
+    console.error("[Admin SDK] Firestore initialization failed:", error);
     throw error;
   }
 }
