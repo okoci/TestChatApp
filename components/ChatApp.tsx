@@ -9,19 +9,39 @@ import { ensureAnonymousAuth, subscribeAuth } from "@/lib/auth";
 const USERNAME_STORAGE_KEY = "chat-username";
 const ROOM_STORAGE_KEY = "chat-room-id";
 
+type AuthStatus = "loading" | "authenticated" | "error";
+
 export default function ChatApp() {
   const [username, setUsername] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [roomId, setRoomId] = useState<string | null>(null);
-  const [isReady, setIsReady] = useState(false);
+  const [authStatus, setAuthStatus] = useState<AuthStatus>("loading");
   const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
+    const unsubscribe = subscribeAuth((nextUser) => {
+      if (cancelled || !nextUser) {
+        return;
+      }
+
+      setUser(nextUser);
+      setAuthStatus("authenticated");
+      setAuthError(null);
+    });
+
     async function initialize() {
       try {
-        await ensureAnonymousAuth();
+        const authenticatedUser = await ensureAnonymousAuth();
+
+        if (cancelled) {
+          return;
+        }
+
+        setUser(authenticatedUser);
+        setAuthStatus("authenticated");
+        setAuthError(null);
       } catch (error) {
         console.error(error);
 
@@ -29,21 +49,10 @@ export default function ChatApp() {
           setAuthError(
             "匿名認証に失敗しました。ページを再読み込みしてください。",
           );
+          setAuthStatus("error");
         }
       }
     }
-
-    const unsubscribe = subscribeAuth((nextUser) => {
-      if (cancelled) {
-        return;
-      }
-
-      setUser(nextUser);
-
-      if (nextUser) {
-        setAuthError(null);
-      }
-    });
 
     void initialize();
 
@@ -57,8 +66,6 @@ export default function ChatApp() {
     if (storedRoomId) {
       setRoomId(storedRoomId);
     }
-
-    setIsReady(true);
 
     return () => {
       cancelled = true;
@@ -85,7 +92,7 @@ export default function ChatApp() {
     setUsername(null);
   }
 
-  if (!isReady) {
+  if (authStatus === "loading") {
     return (
       <div className="flex h-dvh items-center justify-center bg-slate-50 text-sm text-slate-500">
         読み込み中...
@@ -93,7 +100,7 @@ export default function ChatApp() {
     );
   }
 
-  if (authError || !user) {
+  if (authStatus === "error" || !user) {
     return (
       <div className="flex h-dvh items-center justify-center bg-slate-50 px-4 text-center text-sm text-red-600">
         {authError ?? "認証情報を取得できませんでした。"}
